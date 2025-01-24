@@ -128,6 +128,7 @@ class Phi3Config(PretrainedConfig):
         tie_word_embeddings=False,
         rope_theta=10000.0,
         rope_scaling=None,
+        partial_rotary_factor=0.75,
         bos_token_id=1,
         eos_token_id=32000,
         pad_token_id=32000,
@@ -155,6 +156,7 @@ class Phi3Config(PretrainedConfig):
         self.use_cache = use_cache
         self.rope_theta = rope_theta
         self.rope_scaling = rope_scaling
+        self.partial_rotary_factor = partial_rotary_factor
         self._rope_scaling_adjustment()
         self._rope_scaling_validation()
         self.sliding_window = sliding_window
@@ -204,7 +206,7 @@ class Phi3Config(PretrainedConfig):
             raise ValueError(
                 f"`rope_scaling`'s short_factor field must be a list of numbers, got {rope_scaling_short_factor}"
             )
-        if not len(rope_scaling_short_factor) == self.hidden_size // self.num_attention_heads // 2:
+        if not len(rope_scaling_short_factor) == self.hidden_size // self.num_attention_heads // 2 * self.partial_rotary_factor:
             raise ValueError(
                 f"`rope_scaling`'s short_factor field must have length {self.hidden_size // self.num_attention_heads // 2}, got {len(rope_scaling_short_factor)}"
             )
@@ -215,7 +217,7 @@ class Phi3Config(PretrainedConfig):
             raise ValueError(
                 f"`rope_scaling`'s long_factor field must be a list of numbers, got {rope_scaling_long_factor}"
             )
-        if not len(rope_scaling_long_factor) == self.hidden_size // self.num_attention_heads // 2:
+        if not len(rope_scaling_long_factor) == self.hidden_size // self.num_attention_heads // 2 * self.partial_rotary_factor:
             raise ValueError(
                 f"`rope_scaling`'s long_factor field must have length {self.hidden_size // self.num_attention_heads // 2}, got {len(rope_scaling_long_factor)}"
             )

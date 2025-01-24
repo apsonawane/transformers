@@ -157,6 +157,7 @@ class Phi3Attention(nn.Module):
         self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.num_key_value_heads = config.num_key_value_heads
+        self.rotary_ndims = int(self.head_dim * config.partial_rotary_factor)
         self.scaling = self.head_dim**-0.5
         self.attention_dropout = config.attention_dropout
         self.is_causal = True
@@ -188,7 +189,21 @@ class Phi3Attention(nn.Module):
         value_states = value_states.view(hidden_shape).transpose(1, 2)
 
         cos, sin = position_embeddings
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+        # Partial rotary embedding
+        query_rot, query_pass = (
+            query_states[..., : self.rotary_ndims],
+            query_states[..., self.rotary_ndims :],
+        )
+        key_rot, key_pass = (
+            key_states[..., : self.rotary_ndims],
+            key_states[..., self.rotary_ndims :],
+        )
+        # [batch_size, seq_length, num_heads, head_dim // config.partial_rotary_factor]
+        query_rot, key_rot = apply_rotary_pos_emb(query_rot, key_rot, cos, sin)
+
+        # [batch_size, seq_length, num_heads, head_dim]
+        query_states = torch.cat((query_rot, query_pass), dim=-1)
+        key_states = torch.cat((key_rot, key_pass), dim=-1)
 
         if past_key_value is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
